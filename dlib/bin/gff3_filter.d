@@ -1,7 +1,5 @@
-module bin.gff3_filter;
-
 import std.stdio, std.file, std.conv, std.getopt, std.string;
-import bio.gff3.validation, bio.gff3.filtering.filtering,
+import bio.gff3.file, bio.gff3.validation, bio.gff3.filtering,
        bio.gff3.record_range, bio.gff3.selection, bio.gff3.record,
        bio.gff3.conv.json, bio.gff3.conv.table, bio.gff3.conv.gff3,
        bio.gff3.conv.gtf;
@@ -12,13 +10,14 @@ import util.split_file, util.version_helper;
  * interested in CDS, you can use this utility to extract all CDS
  * records from a file like this:
  *
- *   gff3-filter "field feature == CDS" path-to-file.gff3
+ *   gff3-filter --filter field:feature:equals:CDS path-to-file.gff3
  *
- * See manual page for more information.
+ * See package README for more information.
  */
 
-int gff3_filter(string[] args) {
+int main(string[] args) {
   // Parse command line arguments
+  string filter_string = null;
   string output_filename = null;
   long at_most = -1;
   bool show_version = false;
@@ -34,11 +33,11 @@ int gff3_filter(string[] args) {
   bool gff3_output = false;
   string selection = null;
   bool json = false;
-  bool debug_mode = false;
   bool help = false;
   try {
     getopt(args,
         std.getopt.config.passThrough,
+        "filter|f", &filter_string,
         "output|o", &output_filename,
         "at-most|a", &at_most,
         "version", &show_version,
@@ -50,7 +49,6 @@ int gff3_filter(string[] args) {
         "gff3-output", &gff3_output,
         "select", &selection,
         "json", &json,
-        "debug", &debug_mode,
         "help", &help);
   } catch (Exception e) {
     writeln(e.msg);
@@ -69,25 +67,17 @@ int gff3_filter(string[] args) {
     return 0;
   }
 
-  if (debug_mode) {
-    // Print tokens and exit
-    writeln("Words as understood by compiler: ", args[1].to_tokens());
-    return 0;
-  }
-
   if (gff3_output) {
     gtf_output = false;
   }
 
-  // Only the filtering expression and filename should be left at this point
-  if (args.length != 3) {
+  // Only a filename should be left at this point
+  auto filename = args[1];
+  if (args.length != 2) {
     print_usage();
     return 2; // Exit the application
   }
 
-  string filter_string = args[1];
-
-  auto filename = args[2];
   // Check if file exists, if not stdin
   alias char[] array;
   if (filename != "-") {
@@ -108,39 +98,40 @@ int gff3_filter(string[] args) {
   output.setvbuf(1048576);
 
   // Prepare for parsing
-  RecordRange records = new RecordRange;
-  if (filename == "-")
-    records.set_input_file(stdin);
-  else
-    records.set_input_file(filename);
-
-  try {
-    records.set_validate(NO_VALIDATION)
-           .set_data_format(gtf_input ? DataFormat.GTF : DataFormat.GFF3)
-           .set_replace_esc_chars(false)
-           .set_after_filter(filter_string.to_filter())
-           .set_keep_comments(keep_comments)
-           .set_keep_pragmas(keep_pragmas);
-  } catch (Exception e) {
-    writeln("Error: ", e.msg);
-    return -1;
+  RecordRange!SplitFile records;
+  if (filename == "-") {
+    if (!gtf_input)
+      records = GFF3File.parse_by_records(stdin);
+    else
+      records = GTFFile.parse_by_records(stdin);
+  } else {
+    if (!gtf_input)
+      records = GFF3File.parse_by_records(filename);
+    else
+      records = GTFFile.parse_by_records(filename);
   }
+
+  records.set_validate(NO_VALIDATION)
+         .set_replace_esc_chars(false)
+         .set_after_filter(string_to_filter(filter_string))
+         .set_keep_comments(keep_comments)
+         .set_keep_pragmas(keep_pragmas);
 
   // Parsing, filtering and output
   bool at_most_reached = false;
   if (selection is null) {
     if (gtf_output) {
-      records.to_gtf(output, at_most, at_most_reached);
+      at_most_reached = records.to_gtf(output, at_most);
     } else if (json) {
-      records.to_json(output, at_most, null, at_most_reached);
+      at_most_reached = records.to_json(output, at_most);
     } else {
-      records.to_gff3(output, at_most, at_most_reached);
+      at_most_reached = records.to_gff3(output, at_most);
     }
   } else {
     if (json) {
-      records.to_json(output, at_most, selection, at_most_reached);
+      at_most_reached = records.to_json(output, at_most, selection);
     } else {
-      records.to_table(output, at_most, selection, at_most_reached);
+      at_most_reached = records.to_table(output, at_most, selection);
     }
   }
 
@@ -164,6 +155,8 @@ void print_usage() {
   writeln("Filter GFF3 file and write records to stdout");
   writeln();
   writeln("Options:");
+  writeln("  -f, --filter    A filtering expresion. Only records which match the");
+  writeln("                  expression will be passed to stdout or output file.");
   writeln("  --select        Output data table format with columns specified by an argument");
   writeln("  -o, --output    Instead of writing results to stdout, write them to");
   writeln("                  this file.");
@@ -177,8 +170,6 @@ void print_usage() {
   writeln("  --gtf-output    Output data in GTF format");
   writeln("  --gff3-output   Output data in GFF3 format");
   writeln("  --json          Output data in JSON format");
-  writeln("  --debug         Split filtering expression into words and exit. The resulting");
-  writeln("                  list can be used to check for missing spaces and similar.");
   writeln("  --version       Output version information and exit.");
   writeln("  --help          Print this information and exit.");
   writeln();

@@ -1,15 +1,13 @@
-module bin.gff3_to_json;
-
 import std.stdio, std.file, std.conv, std.getopt, std.string;
-import bio.gff3.validation, bio.gff3.record_range, bio.gff3.conv.json,
-       bio.gff3.feature_range;
+import bio.gff3.file, bio.gff3.validation, bio.gff3.record_range,
+       bio.gff3.conv.json, bio.gff3.feature_range;
 import util.split_file, util.version_helper;
 
 /**
  * A utility for conversion of data in GFF3 format to JSON.
  */
 
-int gff3_to_json(string[] args) {
+int main(string[] args) {
   // Parse command line arguments
   string output_filename = null;
   bool show_version = false;
@@ -75,32 +73,38 @@ int gff3_to_json(string[] args) {
 
   // Prepare for parsing
   if (features_selected) {
-    FeatureRange features = new FeatureRange;
+    FeatureRange features;
     if (gtf_input) {
       // raise error
     } else {
-      if (filename == "-")
-        features.set_input_file(stdin);
-      else
-        features.set_input_file(filename);
+      if (filename == "-") {
+        features = GFF3File.parse_by_features(stdin);
+      } else {
+        features = GFF3File.parse_by_features(filename, feature_cache_size);
+      }
     }
 
-    features.set_feature_cache_size(feature_cache_size)
-            .set_validate(NO_VALIDATION)
+    features.set_validate(NO_VALIDATION)
             .set_replace_esc_chars(true)
             .set_keep_comments(keep_comments)
             .set_keep_pragmas(keep_pragmas);
 
     features.to_json(output);
   } else {
-    RecordRange records = new RecordRange;
-    if (filename == "-")
-      records.set_input_file(stdin);
-    else
-      records.set_input_file(filename);
+    RecordRange!SplitFile records;
+    if (filename == "-") {
+      if (!gtf_input)
+        records = GFF3File.parse_by_records(stdin);
+      else
+        records = GTFFile.parse_by_records(stdin);
+    } else {
+      if (!gtf_input)
+        records = GFF3File.parse_by_records(filename);
+      else
+        records = GTFFile.parse_by_records(filename);
+    }
 
-    records.set_data_format(gtf_input ? DataFormat.GTF : DataFormat.GFF3)
-           .set_validate(NO_VALIDATION)
+    records.set_validate(NO_VALIDATION)
            .set_replace_esc_chars(true)
            .set_keep_comments(keep_comments)
            .set_keep_pragmas(keep_pragmas);

@@ -1,7 +1,7 @@
 module bio.fasta;
 
 import std.conv, std.array, std.stdio, std.algorithm, std.string;
-import util.split_into_lines, util.range_with_cache, util.lines_range;
+import util.split_into_lines, util.range_with_cache;
 
 /**
  * A minimal class for grouping the header and sequence
@@ -12,31 +12,33 @@ class FastaRecord {
   string sequence;
 }
 
-/**
- * Fasta range for FASTA sequences appended to the end of GFF3 data.
- */
-class FastaRange : RangeWithCache!FastaRecord {
-  this(LinesRange data) {
-    this.data = data;
-  }
-
+class GenericFastaRange : RangeWithCache!FastaRecord {
   /**
    * Return all remaining sequences as a dictionary.
    */
   @property string[string] all() {
     string[string] all_data;
-    foreach(rec; this) {
-      auto id = split(rec.header)[0];
-      all_data[id] = rec.sequence;
-    }
+    foreach(rec; this)
+      all_data[rec.header] = rec.sequence;
 
     return all_data;
   }
+}
+
+/**
+ * Fasta range for FASTA sequences appended to the end of GFF3 data.
+ */
+class FastaRange(SourceRangeType) : GenericFastaRange {
+  this(SourceRangeType data) {
+    this.data = data;
+  }
 
   private {
-    LinesRange data;
+    alias typeof(SourceRangeType.front()) Array;
 
-    protected FastaRecord next_item() {
+    SourceRangeType data;
+
+    override protected FastaRecord next_item() {
       auto header = next_fasta_line().idup;
       if (header is null)
         return null;
@@ -49,7 +51,7 @@ class FastaRange : RangeWithCache!FastaRecord {
       }
       data.popFront();
 
-      auto sequence = appender!string();
+      auto sequence = appender!Array();
       auto current_fasta_line = next_fasta_line();
       while ((current_fasta_line != null) && (!is_fasta_header(current_fasta_line)) && (!data.empty)) {
         sequence.put(current_fasta_line);
@@ -66,7 +68,7 @@ class FastaRange : RangeWithCache!FastaRecord {
       return result;
     }
 
-    string next_fasta_line() {
+    Array next_fasta_line() {
       if (data.empty)
         return null;
       auto line = data.front;
@@ -101,12 +103,11 @@ private {
   }
 }
 
-version (unittest) {
-  import util.split_file;
-}
 
 unittest {
-  auto fasta = new FastaRange(new SplitFile(File("./test/data/fasta.fa", "r")));
+  writeln("Testing parsing FASTA data...");
+
+  auto fasta = new FastaRange!(typeof(File.byLine()))(File("./test/data/fasta.fa", "r").byLine());
   assert(fasta.empty == false);
   auto seq1 = fasta.front; fasta.popFront();
   assert(fasta.empty == false);
@@ -137,4 +138,3 @@ unittest {
            "tcaaacagcggctgtaaaaatttgtgattatggttaaagg"));
   }
 }
-

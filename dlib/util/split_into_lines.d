@@ -1,7 +1,7 @@
 module util.split_into_lines;
 
-import std.string;
-import util.lines_range;
+import std.string, std.stdio, std.conv;
+import util.range_with_cache;
 
 /**
  * A string splitter, which defers parsing until front is called.
@@ -10,13 +10,13 @@ import util.lines_range;
  * detected and retrieved. Also, there is no copying involved, only
  * slicing.
  */
-class SplitIntoLines : LinesRange {
+class SplitIntoLines : RangeWithCache!string {
   this(string data) {
     this.data = data;
     this.newline = detect_newline_delim(data);
   }
 
-  protected string next_item() {
+  protected override string next_item() {
     string line = string.init;
     if (!(data is null)) {
       auto nl_index = indexOf(data, newline);
@@ -50,11 +50,8 @@ string detect_newline_delim(string data) {
   return "\n";
 }
 
-version(unittest) {
-  import std.conv;
-}
-
 unittest {
+  writeln("Testing SplitIntoLines...");
   auto lines = new SplitIntoLines("Test\n1\n2\n3");
   assert(lines.empty == false);
   assert(lines.front == "Test"); lines.popFront();

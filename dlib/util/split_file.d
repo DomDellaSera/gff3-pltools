@@ -1,14 +1,14 @@
 module util.split_file;
 
 import std.stdio, std.string;
-import util.lines_range;
+import util.range_with_cache;
 
 /**
  * A range for retrieving text lines from a file. The object retrieves
  * some chunk_size of bytes from the file and then a line is returned
  * by front as a slice of the bigger string.
  */
-class SplitFile : LinesRange {
+class SplitFile : RangeWithCache!string {
   /**
    * The constructor receives the file struct as a parameter and
    * a chunk_size parameter, which is the size of the block which
@@ -19,7 +19,7 @@ class SplitFile : LinesRange {
     this.chunk_size = chunk_size;
   }
 
-  protected string next_item() {
+  override protected string next_item() {
     if (current_chunk.length == 0)
       if (eof_reached)
         return null;

@@ -96,7 +96,11 @@ class DList(T) {
   }
 }
 
+import std.stdio;
+
 unittest {
+  writeln("Testing DList...");
+
   struct TestItem {
     int value;
     TestItem * next;

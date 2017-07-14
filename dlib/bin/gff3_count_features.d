@@ -1,10 +1,8 @@
-module bin.gff3_count_features;
-
 import std.stdio, std.file, std.conv, std.getopt;
-import bio.gff3.validation, bio.gff3.record_range;
+import bio.gff3.file, bio.gff3.validation;
 import util.string_hash, util.version_helper;
 
-int gff3_count_features(string[] args) {
+int main(string[] args) {
   // Parse command line arguments
   bool show_version = false;
   try {
@@ -40,7 +38,7 @@ int gff3_count_features(string[] args) {
 
   }
 
-  auto records = (new RecordRange).set_input_file(filename)
+  auto records = GFF3File.parse_by_records(filename)
                          .set_validate(NO_VALIDATION)
                          .set_replace_esc_chars(false);
   bool[string] IDs;

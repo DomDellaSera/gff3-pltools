@@ -1,11 +1,12 @@
 module bio.gff3.selection;
 
 import std.string;
-import bio.gff3.record, bio.gff3.fields;
+import bio.gff3.record, bio.gff3.filtering;
 import util.split_line;
 
 alias string[] delegate(Record record) ColumnsSelector;
 alias string delegate(Record record) ColumnExtractor;
+
 
 ColumnsSelector to_selector(string column_list) {
   auto extractors = parse_columns_spec(column_list);
@@ -69,10 +70,12 @@ auto create_attribute_extractor(string attr_name) {
   };
 }
 
-import bio.gff3.line;
+import std.stdio;
 
 unittest {
-  auto record = parse_line("a\tb\tc\td\te\tf\tg\th\ti=j");
+  writeln("Testing ColumnSelector...");
+
+  auto record = new Record("a\tb\tc\td\te\tf\tg\th\ti=j");
   assert(to_selector("seqname,source")(record) == ["a", "b"]);
   assert(to_selector("feature")(record) == ["c",]);
   assert(to_selector("start,end")(record) == ["d", "e"]);
@@ -81,7 +84,7 @@ unittest {
   assert(to_selector("score,strand,attr i")(record) == ["f", "g", "j"]);
   assert(to_selector("score,strand,attr i,attr k")(record) == ["f", "g", "j", ""]);
 
-  record = parse_line("a\t.\tc\td\te\tf\tg\th\t.");
+  record = new Record("a\t.\tc\td\te\tf\tg\th\t.");
   assert(to_selector("seqname,source,attr test")(record) == ["a", "", ""]);
 }
 

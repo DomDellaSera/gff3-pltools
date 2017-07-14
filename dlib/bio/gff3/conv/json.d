@@ -93,13 +93,13 @@ void to_json(Feature feature, ref Appender!string app) {
   app.put("]}");
 }
 
-string to_json(RecordRange records) {
+string to_json(GenericRecordRange records) {
   Appender!string app;
   to_json(records, app);
   return app.data;
 }
 
-void to_json(RecordRange records, ref Appender!string app) {
+void to_json(GenericRecordRange records, ref Appender!string app) {
   app.put("{\"records\":[");
 
   bool first_attr = true;
@@ -114,12 +114,7 @@ void to_json(RecordRange records, ref Appender!string app) {
   app.put("]}");
 }
 
-private {
-  bool ignore;
-}
-
-void to_json(RecordRange records, File output, long at_most = -1, string selection = null, ref bool limit_reached = ignore) {
-  limit_reached = false;
+bool to_json(GenericRecordRange records, File output, long at_most = -1, string selection = null) {
   // First prepare the selector delegate
   ColumnsSelector selector = null;
   string[] columns = null;
@@ -148,12 +143,13 @@ void to_json(RecordRange records, File output, long at_most = -1, string selecti
     // Check if the "at_most" limit has been reached
     if (counter == at_most) {
       output.write(",{\"limit_reached\":\"yes\"}]}");
-      limit_reached = true;
-      break;
+      return true;
     }
   }
 
   output.write("]}");
+
+  return false;
 }
 
 
@@ -287,16 +283,17 @@ string escape_invalid_chars(string json) {
 
 
 import std.stdio;
-import bio.gff3.line;
 
 unittest {
-  auto record = parse_line(".\t.\t.\t.\t.\t.\t.\t.\t.");
+  writeln("Testing to_json(Record)...");
+
+  auto record = new Record(".\t.\t.\t.\t.\t.\t.\t.\t.");
   assert(record.to_json() == "{\"seqname\":\"\",\"source\":\"\",\"feature\":\"\",\"start\":\"\",\"end\":\"\",\"score\":\"\",\"strand\":\"\",\"phase\":\"\",\"attributes\":{}}");
 
-  record = parse_line(".\t.\t.\t.\t.\t.\t.\t.\tID=testing");
+  record = new Record(".\t.\t.\t.\t.\t.\t.\t.\tID=testing");
   assert(record.to_json() == "{\"seqname\":\"\",\"source\":\"\",\"feature\":\"\",\"start\":\"\",\"end\":\"\",\"score\":\"\",\"strand\":\"\",\"phase\":\"\",\"attributes\":{\"ID\":\"testing\"}}");
 
-  record = parse_line("1\t2\t3\t4\t5\t6\t7\t8\tID=testing");
+  record = new Record("1\t2\t3\t4\t5\t6\t7\t8\tID=testing");
   assert(record.to_json() == "{\"seqname\":\"1\",\"source\":\"2\",\"feature\":\"3\",\"start\":\"4\",\"end\":\"5\",\"score\":\"6\",\"strand\":\"7\",\"phase\":\"8\",\"attributes\":{\"ID\":\"testing\"}}");
 }
 

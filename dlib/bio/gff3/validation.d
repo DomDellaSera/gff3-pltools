@@ -2,7 +2,7 @@ module bio.gff3.validation;
 
 import std.conv, std.stdio, std.array, std.string, std.exception;
 import std.ascii;
-import util.split_line, util.is_float;
+import bio.exceptions, util.split_line, util.is_float;
 
 
 /**
@@ -12,14 +12,6 @@ import util.split_line, util.is_float;
  * a Record object with the default values.
  */
 alias bool function(string filename, int line_number, string line) RecordValidator;
-
-/**
- * This exception is thrown when a parsing error is found when using
- * EXCEPTIONS_ON_ERROR.
- */
-class ParsingException : Exception {
-  this(string message) { super(message); }
-}
 
 /**
  * This function will perform validation, and in case there is a problem,
@@ -81,8 +73,7 @@ auto is_invalid_in_attribute = function bool(char character) {
           (character == '=') ||
           (character == ';') ||
           (character == '&') ||
-          (character == ',') ||
-          (character == '"') );
+          (character == ','));
 };
 
 
@@ -342,6 +333,8 @@ string check_for_characters_invalid_in_any_field(string field_name, string field
 
 
 unittest {
+  writeln("Testing validate_gff3_line...");
+
   // Minimal test
   assert(validate_gff3_line(".\t.\t.\t.\t.\t.\t.\t.\tID=1") is null);
   // Test splitting multiple attributes

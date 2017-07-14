@@ -1,11 +1,9 @@
-module bin.gff3_sort;
-
 import std.stdio, std.file, std.conv, std.getopt;
-import bio.gff3.validation, bio.gff3.feature, bio.gff3.conv.json,
-       bio.gff3.record_range;
+import bio.gff3.file, bio.gff3.validation, bio.gff3.feature,
+       bio.gff3.conv.json;
 import util.string_hash, util.version_helper;
 
-int gff3_sort(string[] args) {
+int main(string[] args) {
   // Parse command line arguments
   string output_filename = null;
   bool keep_fasta = false;
@@ -61,7 +59,7 @@ int gff3_sort(string[] args) {
   output.setvbuf(1_048_576);
 
   // First pass - collecting info
-  auto records = (new RecordRange).set_input_file(filename);
+  auto records = GFF3File.parse_by_records(filename);
   records.set_validate(NO_VALIDATION)
          .set_replace_esc_chars(false);
   IDData[string] IDs;
@@ -75,7 +73,7 @@ int gff3_sort(string[] args) {
   }
 
   // Second pass - collect and output features
-  records = (new RecordRange).set_input_file(filename);
+  records = GFF3File.parse_by_records(filename);
   records.set_validate(NO_VALIDATION)
          .set_replace_esc_chars(false)
          .set_keep_comments(keep_comments)
@@ -143,7 +141,7 @@ struct IDData {
 }
 
 void print_usage() {
-  writeln("Usage: gff3-sort [OPTIONS] FILE");
+  writeln("Usage: count-features [OPTIONS] FILE");
   writeln("Sort features in FILE so that records which are part of the same feature");
   writeln("are in the same place in the file.");
   writeln();

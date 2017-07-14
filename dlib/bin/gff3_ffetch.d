@@ -1,61 +1,45 @@
-module bin.gff3_ffetch;
-
 import std.stdio, std.file, std.conv, std.getopt, std.string;
-import bio.gff3.validation,
+import bio.gff3.file, bio.gff3.validation, bio.gff3.filtering,
        bio.gff3.record_range, bio.gff3.selection, bio.gff3.record,
        bio.gff3.conv.json, bio.gff3.conv.table, bio.gff3.conv.gff3,
        bio.gff3.conv.gtf, bio.gff3.conv.fasta, bio.fasta;
 import util.split_file, util.version_helper, util.read_file,
-       util.split_into_lines, util.logger;
+       util.split_into_lines;
 
 /**
- * A utility for fetching sequences from GFF3 and FASTA files.
+ * A utility for fetching sequences from GFF3 and FASTA files files.
  *
  *   gff3-ffetch cds path-to-file.fa path-to-file.gff3
  *
  * See package README for more information.
  */
 
-int gff3_ffetch(string[] args) {
+int main(string[] args) {
   // Parse command line arguments
   string parent_feature_type = null;
   string output_filename = null;
   bool translate = false;
+  bool validate = false;
   bool fix = false;
   bool fix_wormbase = false;
   bool no_assemble = false;
   bool phase = false;
   bool frame = false;
   bool trim_end = false;
-  int verbosity_level = 1;
   bool show_version = false;
   bool help = false;
-  void verbosity_level_handler(string option) {
-    switch(option) {
-      case "v":
-        verbosity_level += 1;
-        break;
-      case "q":
-        verbosity_level -= 1;
-        break;
-      default:
-        throw new Exception("This should never happen. Please report to maintainer.");
-        break;
-    }
-  }
   try {
     getopt(args,
         std.getopt.config.passThrough,
         "parent-type", &parent_feature_type,
         "output|o", &output_filename,
         "translate", &translate,
+        "validate", &validate,
         "fix", &fix,
         "no-assemble", &no_assemble,
         "phase", &phase,
         "frame", &frame,
         "trim-end", &trim_end,
-        "v", &verbosity_level_handler,
-        "q", &verbosity_level_handler,
         "version", &show_version,
         "help", &help);
   } catch (Exception e) {
@@ -80,8 +64,6 @@ int gff3_ffetch(string[] args) {
     frame = true;
     trim_end = true;
   }
-
-  init_default_logger(verbosity_level);
 
   // The first argument left should be the feature type
   auto feature_type = toLower(args[1]);
@@ -127,11 +109,11 @@ int gff3_ffetch(string[] args) {
     if (fasta_data is null) {
       if (fasta_filename !is null) {
         fasta_data = read(File(fasta_filename, "r"));
-        fasta_map = (new FastaRange(new SplitIntoLines(fasta_data))).all;
+        fasta_map = (new FastaRange!SplitIntoLines(new SplitIntoLines(fasta_data))).all;
       }
     }
 
-    auto records = (new RecordRange).set_input_file(filename);
+    auto records = GFF3File.parse_by_records(filename);
     records.set_validate(NO_VALIDATION)
            .set_replace_esc_chars(false)
            .set_keep_comments(false)
@@ -144,12 +126,13 @@ int gff3_ffetch(string[] args) {
 }
 
 void print_usage() {
-  writeln("Usage: gff3-ffetch FEATURE_TYPE [FASTA_FILE] GFF3_FILE... [OPTIONS]");
-  writeln("Assemble sequences form GFF3 and FASTA files");
+  writeln("Usage: gff3-ffetch [OPTIONS] [FILE1.fa] FILE2.gff3...");
+  writeln("Fetch sequences form GFF3 and FASTA files");
   writeln();
   writeln("Options:");
   writeln("  --parent-type   Use parent features for grouping instead of ID attr");
   writeln("  --translate     Output as amino acid sequence.");
+  writeln("  --validate      Validate GFF3 file by translating.");
   writeln("  --fix           Same as phase, frame and trim-end options together.");
   writeln("  --no-assemble   Output each record as a sequence.");
   writeln("  --phase         Take into account the phase field of a GFF3 record and adjust");
@@ -160,10 +143,7 @@ void print_usage() {
   writeln("                  length modulo 3 is 0");
   writeln("  -o, --output    Instead of writing results to stdout, write them to");
   writeln("                  this file.");
-  writeln("  -v, -q          Increase/decrease verbosity level. Multiple can be used in");
-  writeln("                  one command.");
   writeln("  --version       Output version information and exit.");
   writeln("  --help          Print this information and exit.");
   writeln();
 }
-

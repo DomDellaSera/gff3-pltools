@@ -1,8 +1,8 @@
 module bio.gff3.conv.fasta;
 
-import std.stdio, std.conv, std.array, std.algorithm, std.format, std.string;
+import std.stdio, std.conv, std.array, std.algorithm, std.format;
 import bio.gff3.record_range, bio.fasta;
-import util.split_into_lines, util.array_includes, util.equals_ci, util.logger;
+import util.split_into_lines, util.array_includes, util.equals;
 
 /**
  * Converts the passed records range to one fasta sequence per feature.
@@ -25,7 +25,7 @@ import util.split_into_lines, util.array_includes, util.equals_ci, util.logger;
  *     trim_end =             trim the end of each sequence part to get modulo 3 length
  *     output =               File object where the fasta data will be written
  */
-void to_fasta(RecordRange records, string feature_type, string parent_feature_type,
+void to_fasta(GenericRecordRange records, string feature_type, string parent_feature_type,
               string[string] fasta_data, bool no_assemble, bool phase, bool frame,
               bool trim_end, bool translate, File output) {
   RecordData[] all_records;
@@ -44,14 +44,8 @@ void to_fasta(RecordRange records, string feature_type, string parent_feature_ty
   }
 
   // Fetch fasta from end of GFF3 file if no fasta data provided
-  if (fasta_data is null) {
-    auto fasta_range = records.get_fasta_range();
-    if (fasta_range is null) {
-      error("No FASTA data found at the end of GFF3 file: " ~ records.filename);
-    } else {
-      fasta_data = records.get_fasta_range().all;
-    }
-  }
+  if (fasta_data is null)
+    fasta_data = records.get_fasta_range().all;
 
   // Output features in fasta format
   foreach(feature; features) {
@@ -70,7 +64,7 @@ private:
 /**
  * Collect all records whose type is in the feature_types array.
  */
-RecordData[] collect_data(RecordRange records, string[] feature_types) {
+RecordData[] collect_data(GenericRecordRange records, string[] feature_types) {
   Appender!(RecordData[]) all_records;
   foreach(rec; records) {
     if (feature_types.includes_ci(rec.feature)) {
@@ -126,9 +120,7 @@ class FeatureData {
     if (rec0.id.length == 0) {
       if (rec0.seqname.length == 0) {
         new_id.put("unknown");
-        warn("A records without a sequence name and ID attribute: " ~
-             to!string(rec0.feature) ~ ", start: " ~ to!string(rec0.start) ~
-             ", end: " ~ to!string(rec0.end));
+        // TODO: report warning
       } else {
         new_id.formattedWrite("%s %d %d", rec0.seqname, rec0.start, rec0.end);
       }
@@ -155,6 +147,7 @@ class FeatureData {
     string fasta_sequence;
     string seqname = records[0].seqname;
     if (seqname.length == 0) {
+      // TODO: report warning
       fasta_sequence = null;
     } else {
       if (seqname in fasta_data) {
@@ -163,8 +156,7 @@ class FeatureData {
         else
           fasta_sequence = to_fasta_positive_strand(fasta_data, phase, frame, trim_end);
       } else {
-        warn("A record was reffering to a FASTA sequence that could not be found: " ~
-             seqname);
+        // TODO: report error
         fasta_sequence = null;
       }
     }
@@ -180,9 +172,9 @@ class FeatureData {
     auto copy = records.dup;
     reverse(copy);
     foreach(rec; copy) {
-      auto sequence_part = sequence[cast(size_t)(rec.start-1)..cast(size_t)(rec.end)].dup;
+      auto sequence_part = sequence[to!uint(rec.start)-1..to!uint(rec.end)].dup;
       if (sequence_part.length == 0) {
-        continue;
+        // TODO: report sequence length 0, e.g. start == end is true
       } else {
         reverse(sequence_part);
         reverse_strand(sequence_part);
@@ -205,7 +197,7 @@ class FeatureData {
     auto sequence = fasta_data[seqname];
 
     foreach(rec; records) {
-      auto sequence_part = sequence[cast(size_t)(rec.start-1)..cast(size_t)(rec.end)];
+      auto sequence_part = sequence[to!uint(rec.start)-1..to!uint(rec.end)];
       if (phase)
         sequence_part = adjust_for_phase(sequence_part, rec);
       if (frame)
@@ -220,9 +212,7 @@ class FeatureData {
 
   T[] adjust_for_phase(T)(T[] sequence, RecordData rec) {
     if (sequence.length < rec.phase) {
-      warn("Sequence shorter than phase shift size for the following record: " ~
-           rec.feature ~ ", ID attr: " ~ rec.id ~ ", start: " ~ to!string(rec.start) ~
-           ", end:" ~ to!string(rec.end));
+      // TODO: report warning
     }  else {
       sequence = sequence[rec.phase..$];
     }
@@ -237,7 +227,7 @@ class FeatureData {
       frameshift[2] = count_stop_codons(sequence[2..$-3]);
       sequence = sequence[min_pos(frameshift)..$];
     } else {
-      warn(cast(string) ("Sequence not long enough for calculating frameshift: " ~ sequence));
+      // TODO: report a warning
     }
     return sequence;
   }
@@ -302,9 +292,7 @@ FeatureData[] collect_features(RecordData[] all_records, string child_feature_ty
   // Collect all ID's of parents
   foreach(rec; all_records) {
     if (equals_ci(rec.feature, parent_feature_type)) {
-      if (rec.id.length == 0) {
-        warn(parent_feature_type ~ " record without an ID");
-      } else if (rec.id !in lookup_table) {
+      if (rec.id !in lookup_table) {
         auto new_feature = new FeatureData;
         lookup_table[rec.id] = new_feature;
         features.put(new_feature);
@@ -314,14 +302,11 @@ FeatureData[] collect_features(RecordData[] all_records, string child_feature_ty
 
   foreach(rec; all_records) {
     if (equals_ci(rec.feature, child_feature_type)) {
-      if (rec.parent.length == 0) {
-        warn(child_feature_type ~ " record without a Parent attribute");
-      } else if (rec.parent in lookup_table) {
+      if (rec.parent in lookup_table) {
         rec.id = rec.parent;
         lookup_table[rec.parent].records ~= rec;
       } else {
-        warn("Could not find parent record: ID: " ~ rec.parent ~ ", type: " ~
-             parent_feature_type);
+        // TODO: report error
       }
     }
   }
@@ -375,6 +360,8 @@ int min_pos(int[] values) {
 }
 
 unittest {
+  writeln("Testing min_pos()...");
+
   assert(min_pos([1, 2, 3]) == 0);
   assert(min_pos([2, 1, 3]) == 1);
   assert(min_pos([6, 5, 4]) == 2);
@@ -391,7 +378,7 @@ string translate_sequence(string sequence) {
   while(sequence.length >= 3) {
     string codon = sequence[0..3];
     char aa;
-    switch(toUpper(codon)) {
+    switch(codon) {
       case "TTT":
       case "TTC":
         aa = 'F';
@@ -505,8 +492,7 @@ string translate_sequence(string sequence) {
         aa = 'G';
         break;
       default:
-        warn("Found invalid nucleotide sequence: " ~ sequence[0..3]);
-        aa = 'X';
+        throw new Exception("This should not happen, pleasee report to mantained.");
         break;
     }
     app.put(aa);
@@ -515,4 +501,3 @@ string translate_sequence(string sequence) {
 
   return app.data;
 }
-

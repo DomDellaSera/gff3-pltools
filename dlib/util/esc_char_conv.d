@@ -78,26 +78,16 @@ alias bool function(char) InvalidCharProc;
  * to an appender, while escaping the characters using the url
  * escaping conventions.
  */
-void escape_chars(T,P)(T field_value, InvalidCharProc is_invalid, Appender!P app) {
-  if (is_invalid is null) {
-    app.put(field_value);
-  } else {
-    foreach(character; field_value) {
-      if (is_invalid(character) || (character == '%')) {
-        app.put('%');
-        app.put(upper_4bits_to_hex(character));
-        app.put(lower_4bits_to_hex(character));
-      } else {
-        app.put(character);
-      }
+void append_and_escape_chars(T)(Appender!T app, string field_value, InvalidCharProc is_invalid) {
+  foreach(character; field_value) {
+    if (is_invalid(character) || (character == '%')) {
+      app.put('%');
+      app.put(upper_4bits_to_hex(character));
+      app.put(lower_4bits_to_hex(character));
+    } else {
+      app.put(character);
     }
   }
-}
-
-T[] escape_chars(T)(T[] field_value, InvalidCharProc is_invalid) {
-  auto app = appender!(T[])();
-  escape_chars(field_value, is_invalid, app);
-  return app.data;
 }
 
 /**
@@ -126,15 +116,19 @@ char lower_4bits_to_hex(char character) {
 }
 
 
-import std.exception;
+import std.stdio, std.exception;
 
 unittest {
+  writeln("Testing convert_url_escaped_char...");
+
   assert(convert_url_escaped_char("3D") == '=');
   assert(convert_url_escaped_char("00") == '\0');
   assertThrown!ConvException(convert_url_escaped_char("0H") == '\0');
 }
 
 unittest {
+  writeln("Testing replace_url_escaped_chars...");
+
   assert(replace_url_escaped_chars("%3D".dup) == "=");
   assert(replace_url_escaped_chars("Testing %3D".dup) == "Testing =");
   assert(replace_url_escaped_chars("Multiple %3B replacements %00 and some %25 more".dup) == "Multiple ; replacements \0 and some % more");
@@ -144,6 +138,8 @@ unittest {
 }
 
 unittest {
+  writeln("Testing append_and_escape_chars()...");
+  
   auto is_invalid_char = function bool(char character) {
     return (std.ascii.isControl(character) ||
             (character == '%') ||
@@ -153,13 +149,13 @@ unittest {
             (character == ','));
   };
   auto app = appender!string();
-  escape_chars("abc", is_invalid_char, app);
+  append_and_escape_chars(app, "abc", is_invalid_char);
   assert(app.data == "abc");
-  escape_chars("\0\t", is_invalid_char, app);
+  append_and_escape_chars(app, "\0\t", is_invalid_char);
   assert(app.data == "abc%00%09");
-  escape_chars("ab=,;", is_invalid_char, app);
+  append_and_escape_chars(app, "ab=,;", is_invalid_char);
   assert(app.data == "abc%00%09ab%3D%2C%3B");
-  escape_chars(">", is_invalid_char, app);
+  append_and_escape_chars(app, ">", is_invalid_char);
   assert(app.data == "abc%00%09ab%3D%2C%3B>");
 }
 

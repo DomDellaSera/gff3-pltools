@@ -1,10 +1,8 @@
-module bin.gff3_to_gtf;
-
 import std.stdio, std.file, std.conv, std.getopt, std.string;
-import bio.gff3.record_range, bio.gff3.validation, bio.gff3.conv.gtf;
+import bio.gff3.file, bio.gff3.record_range, bio.gff3.validation;
 import util.version_helper;
 
-int gff3_to_gtf(string[] args) {
+int main(string[] args) {
   // Parse command line arguments
   string output_filename = null;
   bool show_version = false;
@@ -47,18 +45,18 @@ int gff3_to_gtf(string[] args) {
   }
 
   // Open file and loop over all records
-  RecordRange records;
+  GenericRecordRange records;
   if (input_filename == "-")
-    records = (new RecordRange).set_input_file(stdin);
+    records = GFF3File.parse_by_records(stdin);
   else
-    records = (new RecordRange).set_input_file(input_filename);
+    records = GFF3File.parse_by_records(input_filename);
 
   records.set_validate(NO_VALIDATION)
          .set_replace_esc_chars(false)
          .set_keep_pragmas(true)
          .set_keep_comments(true);
   foreach(rec; records) {
-    output.writeln(rec.to_gtf());
+    output.writeln(rec.toString(DataFormat.GTF));
   }
 
   return 0;
