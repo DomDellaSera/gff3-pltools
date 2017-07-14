@@ -1,0 +1,45 @@
+# encoding: utf-8
+
+require 'rake/clean'
+
+ENV["PATH"] = File.join(File.dirname(__FILE__), "bin") + ":" + ENV["PATH"]
+
+dc = ENV["DC"]
+
+
+directory "bin"
+CLEAN.include("bin/")
+
+DFILES = ["bio/gff3/file.d",
+          "bio/gff3/data.d",
+          "bio/gff3/record.d",
+          "bio/gff3/record_range.d",
+          "bio/gff3/validation.d",
+          "bio/fasta.d",
+          "bio/gff3/feature.d",
+          "bio/gff3/feature_range.d",
+          "bio/gff3/filtering.d",
+          "bio/gff3/data_formats.d",
+          "bio/gff3/selection.d",
+          "bio/gff3/conv/json.d",
+          "bio/gff3/conv/table.d",
+          "bio/gff3/conv/gff3.d",
+          "bio/gff3/conv/gtf.d",
+          "bio/gff3/conv/fasta.d",
+          "util/esc_char_conv.d",
+          "util/join_lines.d",
+          "util/read_file.d",
+          "util/split_into_lines.d",
+          "util/range_with_cache.d",
+          "util/split_file.d",
+          "util/split_line.d",
+          "util/dlist.d",
+          "util/string_hash.d",
+          "util/version_helper.d",
+          "util/is_float.d",
+          "util/array_includes.d",
+          "util/equals.d",
+          "bio/exceptions.d"].join(" ")
+
+
+dmc "source/app.d"

@@ -1,4 +1,4 @@
-import bio.gff3, std.conv;
+import dlib.bio.gff3, std.conv;
 
 GFF3File[int] openFiles;
 
@@ -41,4 +41,3 @@ extern (C) GFF3Record * biohpc_gff3_get_record(FileID fileID) {
   auto file = openFiles[fileID];
   return file.get_record();
 }
-
